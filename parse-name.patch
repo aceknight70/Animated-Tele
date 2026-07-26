@@ -1,0 +1,97 @@
+--- src/lib/api.ts
++++ src/lib/api.ts
+@@ -19,10 +19,25 @@
+       animationStyle = row.title_animation_style;
+     }
++
++    let animationSpeed = 'gentle';
++    let backgroundEffect = 'none';
++    let backgroundColor = '#ffffff';
++    try {
++      if (row.name && row.name.startsWith('{')) {
++        const parsed = JSON.parse(row.name);
++        animationSpeed = parsed.speed || 'gentle';
++        backgroundEffect = parsed.bg || 'none';
++        backgroundColor = parsed.color || '#ffffff';
++      } else {
++        animationSpeed = row.name || 'gentle';
++      }
++    } catch(e) {}
++
+     return {
+       id: row.id,
+       client_id: row.client_id,
+       type: row.kind === 'teleprompter_product' ? 'teleprompter' : row.kind,
+       animationStyle: animationStyle || 'fade', // fallback
+-      animationSpeed: (row.name as 'gentle' | 'fast') || 'gentle',
++      animationSpeed: animationSpeed as 'gentle' | 'fast',
++      backgroundEffect,
++      backgroundColor,
+       duration: row.duration_seconds || 7,
+       teleprompterText: row.script,
+@@ -37,11 +52,18 @@
+ 
+ export const createRoomInDb = async (room: Room): Promise<any> => {
++  const nameJson = JSON.stringify({
++    speed: room.animationSpeed || 'gentle',
++    bg: room.backgroundEffect || 'none',
++    color: room.backgroundColor || '#ffffff'
++  });
++
+   const payload: any = {
+     id: room.id,
+     client_id: room.client_id,
+     kind: room.type === 'teleprompter' ? 'teleprompter_product' : room.type,
+-    name: room.animationSpeed || 'gentle',
++    name: nameJson,
+     duration_seconds: room.duration,
+     position: room.position,
+   };
+@@ -64,12 +86,17 @@
+ };
+ 
+-export const updateRoomInDb = async (id: string, updates: Partial<Room>, roomType: string): Promise<void> => {
++export const updateRoomInDb = async (room: Room): Promise<void> => {
+   const payload: any = {};
+-  if (updates.type !== undefined) payload.kind = updates.type === 'teleprompter' ? 'teleprompter_product' : updates.type;
+-  if (updates.animationSpeed !== undefined) payload.name = updates.animationSpeed;
++  payload.kind = room.type === 'teleprompter' ? 'teleprompter_product' : room.type;
++  
++  const nameJson = JSON.stringify({
++    speed: room.animationSpeed || 'gentle',
++    bg: room.backgroundEffect || 'none',
++    color: room.backgroundColor || '#ffffff'
++  });
++  payload.name = nameJson;
+   
+-  if (updates.animationStyle !== undefined) {
+-    if (roomType === 'title' || updates.type === 'title') {
+-      payload.title_animation_style = updates.animationStyle;
+-    } else {
+-      payload.animation_style = updates.animationStyle;
+-    }
++  if (room.type === 'title') {
++    payload.title_animation_style = room.animationStyle;
++  } else {
++    payload.animation_style = room.animationStyle;
+   }
+   
+-  if (updates.duration !== undefined) payload.duration_seconds = updates.duration;
+-  if (updates.teleprompterText !== undefined) payload.script = updates.teleprompterText;
+-  if (updates.titleText !== undefined) payload.title_text = updates.titleText;
+-  if (updates.image_path !== undefined) payload.image_path = updates.image_path;
+-  if (updates.image_width !== undefined) payload.image_width = updates.image_width;
+-  if (updates.image_height !== undefined) payload.image_height = updates.image_height;
+-  if (updates.position !== undefined) payload.position = updates.position;
++  payload.duration_seconds = room.duration;
++  payload.script = room.teleprompterText || null;
++  payload.title_text = room.titleText || null;
++  payload.image_path = room.image_path || null;
++  payload.image_width = room.image_width || null;
++  payload.image_height = room.image_height || null;
++  payload.position = room.position;
+ 
+   if (Object.keys(payload).length > 0) {
+-    const { error } = await supabase.from('ats_rooms').update(payload).eq('id', id);
++    const { error } = await supabase.from('ats_rooms').update(payload).eq('id', room.id);
+     if (error) {

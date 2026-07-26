@@ -1,0 +1,77 @@
+--- src/App.tsx
++++ src/App.tsx
+@@ -73,6 +73,10 @@
+   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+   const [prefersReduced, setPrefersReduced] = useState(false);
++  const [includeMic, setIncludeMic] = useState(false);
++  const [isExporting, setIsExporting] = useState(false);
++  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
++  const recordedChunksRef = useRef<Blob[]>([]);
+ 
+   // Setup prefers-reduced-motion
+   useEffect(() => {
+@@ -342,6 +346,65 @@
+     setPlaybackState('idle');
+     setPlayCount(c => c + 1); // trigger re-render
+   };
++
++  const exportVideo = async () => {
++    try {
++      const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
++      let tracks = [...displayStream.getTracks()];
++      
++      if (includeMic) {
++        try {
++          const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
++          tracks = [...tracks, ...audioStream.getAudioTracks()];
++        } catch (e) {
++          console.warn('Microphone access denied or failed', e);
++        }
++      }
++
++      const combinedStream = new MediaStream(tracks);
++      const recorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm' });
++      mediaRecorderRef.current = recorder;
++      recordedChunksRef.current = [];
++
++      recorder.ondataavailable = (e) => {
++        if (e.data.size > 0) recordedChunksRef.current.push(e.data);
++      };
++
++      recorder.onstop = () => {
++        const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
++        const url = URL.createObjectURL(blob);
++        const a = document.createElement('a');
++        a.href = url;
++        const dateStr = new Date().toISOString().split('T')[0];
++        a.download = `${selectedClientId}-segment-${dateStr}.webm`;
++        a.click();
++        URL.revokeObjectURL(url);
++        setIsExporting(false);
++
++        // Also export JSON
++        const jsonPayload = {
++          client: selectedClientId,
++          exportDate: new Date().toISOString(),
++          totalDuration: rooms.reduce((acc, r) => acc + r.duration, 0),
++          roomsCount: rooms.length
++        };
++        const jsonBlob = new Blob([JSON.stringify(jsonPayload, null, 2)], { type: 'application/json' });
++        const jsonUrl = URL.createObjectURL(jsonBlob);
++        const jsonA = document.createElement('a');
++        jsonA.href = jsonUrl;
++        jsonA.download = `${selectedClientId}-segment-${dateStr}.json`;
++        jsonA.click();
++        URL.revokeObjectURL(jsonUrl);
++      };
++
++      recorder.start();
++      setIsExporting(true);
++      playSegment(true);
++    } catch (e: any) {
++      console.error('Export failed', e);
++      alert('Video export failed or was cancelled: ' + e.message);
++    }
++  };
+ 
+   const client = CLIENTS.find(c => c.id === selectedClientId) || CLIENTS[0];

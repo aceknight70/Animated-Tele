@@ -1,0 +1,6 @@
+{
+  "name": "Animated Template Studio",
+  "description": "A video-segment builder for creating short, animated presentation clips across multiple business clients.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

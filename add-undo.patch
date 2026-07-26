@@ -1,0 +1,73 @@
+--- src/App.tsx
++++ src/App.tsx
+@@ -79,6 +79,20 @@
+   const [isExporting, setIsExporting] = useState(false);
+   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+   const recordedChunksRef = useRef<Blob[]>([]);
++
++  type Action = 
++    | { type: 'add'; room: Room }
++    | { type: 'delete'; room: Room }
++    | { type: 'reorder'; oldRooms: Room[] };
++  const [undoStack, setUndoStack] = useState<Action[]>([]);
++
++  const pushUndo = (action: Action) => {
++    setUndoStack(prev => {
++      const newStack = [...prev, action];
++      if (newStack.length > 10) newStack.shift();
++      return newStack;
++    });
++  };
+ 
+   // Setup prefers-reduced-motion
+   useEffect(() => {
+@@ -167,6 +181,7 @@
+       position: rooms.length,
+     };
+     
++    pushUndo({ type: 'add', room: newRoom });
+     // Optimistic update
+     const newRooms = [...rooms, newRoom];
+     setRooms(newRooms);
+@@ -190,6 +205,7 @@
+     if (!roomToDelete) return;
+ 
++    pushUndo({ type: 'delete', room: roomToDelete });
+     // Optimistic update
+     const newRooms = rooms.filter(r => r.id !== id);
+     setRooms(newRooms);
+@@ -216,6 +232,7 @@
+   };
+ 
+   const moveRoom = async (id: string, direction: 'up' | 'down') => {
++    pushUndo({ type: 'reorder', oldRooms: [...rooms] });
+     const index = rooms.findIndex(r => r.id === id);
+     if (index < 0) return;
+     if (direction === 'up' && index === 0) return;
+@@ -242,6 +259,32 @@
+       console.error('Reorder failed', err);
+     }
+   };
++
++  const handleUndo = async () => {
++    if (undoStack.length === 0) return;
++    const lastAction = undoStack[undoStack.length - 1];
++    setUndoStack(prev => prev.slice(0, -1));
++
++    try {
++      if (lastAction.type === 'add') {
++        setRooms(prev => prev.filter(r => r.id !== lastAction.room.id));
++        if (selectedRoomId === lastAction.room.id) setSelectedRoomId(null);
++        await deleteRoomInDb(lastAction.room.id);
++      } else if (lastAction.type === 'delete') {
++        setRooms(prev => [...prev, lastAction.room].sort((a, b) => a.position - b.position));
++        await createRoomInDb(lastAction.room);
++      } else if (lastAction.type === 'reorder') {
++        setRooms(lastAction.oldRooms);
++        await updateRoomPositions(lastAction.oldRooms.map(r => ({ id: r.id, position: r.position })));
++      }
++    } catch(err) {
++      console.error('Undo failed', err);
++      alert('Undo failed: check console');
++    }
++  };

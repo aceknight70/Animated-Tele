@@ -1,0 +1,59 @@
+import sys
+
+with open('src/App.tsx', 'r') as f:
+    content = f.read()
+
+target = """                {/* Background Selector */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700 block">Background Effect</label>
+                  <select
+                    value={selectedRoom.backgroundEffect || 'none'}
+                    onChange={(e) => updateRoom(selectedRoom.id, { backgroundEffect: e.target.value })}
+                    className="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                  >
+                    {BACKGROUND_EFFECTS.map((effect) => (
+                      <option key={effect.id} value={effect.id}>
+                        {effect.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>"""
+
+replacement = """                {/* Background Selector & Color */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 block mb-2">Background Color</label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={selectedRoom.backgroundColor || '#ffffff'}
+                        onChange={(e) => updateRoom(selectedRoom.id, { backgroundColor: e.target.value })}
+                        className="w-10 h-10 rounded border border-slate-300 cursor-pointer p-0 m-0"
+                        title="Choose background color"
+                      />
+                      <span className="text-sm text-slate-500 uppercase">{selectedRoom.backgroundColor || '#ffffff'}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 block mb-2">Background Effect</label>
+                    <select
+                      value={selectedRoom.backgroundEffect || 'none'}
+                      onChange={(e) => updateRoom(selectedRoom.id, { backgroundEffect: e.target.value })}
+                      className="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                    >
+                      {BACKGROUND_EFFECTS.map((effect) => (
+                        <option key={effect.id} value={effect.id}>
+                          {effect.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>"""
+
+if target in content:
+    with open('src/App.tsx', 'w') as f:
+        f.write(content.replace(target, replacement))
+    print("Replaced successfully")
+else:
+    print("Target not found")

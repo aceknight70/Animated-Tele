@@ -1,0 +1,33 @@
+--- src/components/RoomCanvas.tsx
++++ src/components/RoomCanvas.tsx
+@@ -107,6 +107,31 @@
+           animate: { opacity: 1, scale: 1, rotate: 0, transition: getTransition({ duration: 1 }) },
+           exit: { opacity: 0, scale: 0.8, rotate: -5, transition: { duration: 0.5 } },
+         };
++      case 'blink':
++        return {
++          initial: { opacity: 0 },
++          animate: { opacity: [0, 1, 0, 1, 0, 1], transition: getTransition({ duration: 1.5 }) },
++          exit: { opacity: 0, transition: { duration: 0.5 } },
++        };
++      case 'fall':
++        return {
++          initial: { opacity: 0, y: -200 },
++          animate: { opacity: 1, y: 0, transition: getTransition({ duration: 1, type: 'spring', bounce: 0.4 }) },
++          exit: { opacity: 0, y: 200, transition: { duration: 0.5 } },
++        };
++      case 'materialize':
++        return {
++          initial: { opacity: 0, filter: 'blur(10px)' },
++          animate: { opacity: [0, 1, 1, 0], filter: ['blur(10px)', 'blur(0px)', 'blur(0px)', 'blur(10px)'], transition: { duration: room.duration, times: [0, 0.2, 0.8, 1] } },
++          exit: { opacity: 0, transition: { duration: 0.5 } },
++        };
++      case 'rotate360':
++        return {
++          initial: { opacity: 0, rotate: -360, scale: 0.5 },
++          animate: { opacity: 1, rotate: 0, scale: 1, transition: getTransition({ duration: 1.2 }) },
++          exit: { opacity: 0, scale: 0.8, transition: { duration: 0.5 } },
++        };
+       default:
+         return {
+           initial: { opacity: 0 },
