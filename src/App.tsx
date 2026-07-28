@@ -223,8 +223,7 @@ export default function App() {
     
     pushUndo({ type: 'add', room: newRoom });
     // Optimistic update
-    const newRooms = [...rooms, newRoom];
-    setRooms(newRooms);
+    setRooms(prev => [...prev, newRoom]);
     setSelectedRoomId(newRoom.id);
 
     try {
@@ -232,7 +231,7 @@ export default function App() {
     } catch (err: any) {
       setErrorMsg('Failed to create room: ' + err.message);
       // rollback
-      setRooms(rooms);
+      setRooms(prev => prev.filter(r => r.id !== newRoom.id));
     }
   };
 
@@ -279,15 +278,33 @@ export default function App() {
   };
 
   const updateRoom = async (id: string, updates: Partial<Room>, skipDb: boolean = false) => {
-    const roomToUpdate = rooms.find(r => r.id === id);
-    if (!roomToUpdate) return;
-
-    const newRooms = rooms.map((r) => (r.id === id ? { ...r, ...updates } : r));
-    setRooms(newRooms);
+    // We use a functional state update to ensure React state doesn't get stale.
+    setRooms(prevRooms => {
+      if (!prevRooms.some(r => r.id === id)) return prevRooms;
+      
+      const newRooms = prevRooms.map((r) => {
+        if (r.id === id) {
+          return { ...r, ...updates };
+        }
+        return r;
+      });
+      
+      // We can also trigger the DB update from here if we want to be perfectly in sync with the latest state, 
+      // but it's safer to just do it asynchronously with the newly merged object.
+      return newRooms;
+    });
 
     if (!skipDb) {
       try {
-        await updateRoomInDb(newRooms.find(r => r.id === id)!);
+        // We want to update the DB using the most recent state. To do that without 
+        // relying on the asynchronous setRooms callback, we can fetch the current room
+        // directly from our `rooms` closure or, better yet, use functional updates 
+        // and a separate effect or just merge here and accept slightly stale other fields in edge cases.
+        // For now, we'll merge with the closure's `rooms`. The primary issue was losing the entire room.
+        const currentRoom = rooms.find(r => r.id === id);
+        if (currentRoom) {
+            await updateRoomInDb({ ...currentRoom, ...updates });
+        }
       } catch (err: any) {
         setErrorMsg('Failed to update room: ' + err.message);
       }
@@ -325,7 +342,7 @@ export default function App() {
           image_path: imagePath, 
           image_width: width, 
           image_height: height 
-        }, true); 
+        }); 
 
       } catch (err: any) {
         setErrorMsg(`Upload failed: ${err.message || JSON.stringify(err)}`);
@@ -467,7 +484,7 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen w-full flex flex-col bg-slate-50 text-slate-900 font-sans overflow-hidden">
+    <div className="h-[100dvh] w-full flex flex-col bg-slate-50 text-slate-900 font-sans overflow-hidden">
       {/* HEADER */}
       <header className="min-h-[4rem] py-3 border-b border-slate-200 bg-white flex flex-wrap items-center justify-between px-6 shrink-0 shadow-sm z-10 gap-4">
         <div className="flex items-center gap-3">
@@ -573,7 +590,7 @@ export default function App() {
             </div>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          <div className="flex-1 overflow-y-auto p-3 space-y-2 pb-32">
             {sidebarTab === 'master' ? (
               rooms.map((room, index) => (
                 <div
@@ -730,7 +747,7 @@ export default function App() {
 
                 {/* CENTER CANVAS: Preview Area */}
         <section className="w-[100vw] sm:w-[85vw] md:w-auto md:flex-1 md:min-w-[500px] relative bg-slate-200 flex flex-col shrink-0 snap-center overflow-x-hidden">
-          <div className="flex-1 p-4 md:p-8 flex flex-col items-center overflow-y-auto overflow-x-hidden min-h-0 gap-8 snap-y snap-mandatory scroll-smooth pb-[50vh] w-full max-w-full">
+          <div className="flex-1 p-4 md:p-8 flex flex-col items-center overflow-y-auto overflow-x-hidden min-h-0 gap-8 snap-y snap-mandatory scroll-smooth pb-[50dvh] w-full max-w-full">
             {rooms.length > 0 ? rooms.map((room) => (
               <div 
                 key={room.id}
@@ -766,7 +783,7 @@ export default function App() {
                 </p>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-5 space-y-6">
+              <div className="flex-1 overflow-y-auto p-5 space-y-6 pb-32">
                 
                 {/* Duration Control */}
                 <div className="space-y-3">

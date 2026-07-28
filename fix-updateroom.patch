@@ -1,0 +1,33 @@
+--- src/App.tsx
++++ src/App.tsx
+@@ -280,18 +280,24 @@
+ 
+   const updateRoom = async (id: string, updates: Partial<Room>, skipDb: boolean = false) => {
+-    const roomToUpdate = rooms.find(r => r.id === id);
+-    if (!roomToUpdate) return;
+-
+-    const newRooms = rooms.map((r) => (r.id === id ? { ...r, ...updates } : r));
+-    setRooms(newRooms);
++    let updatedRoom: Room | undefined;
++    setRooms(prevRooms => {
++      const roomExists = prevRooms.some(r => r.id === id);
++      if (!roomExists) return prevRooms;
++      return prevRooms.map((r) => {
++        if (r.id === id) {
++          updatedRoom = { ...r, ...updates };
++          return updatedRoom;
++        }
++        return r;
++      });
++    });
+ 
+     if (!skipDb) {
+       try {
+-        await updateRoomInDb(newRooms.find(r => r.id === id)!);
++        // Need to wait for updatedRoom to be set or just pass the merged room
++        const roomToUpdateInDb = rooms.find(r => r.id === id);
++        if (roomToUpdateInDb) {
++          await updateRoomInDb({ ...roomToUpdateInDb, ...updates });
++        }
+       } catch (err: any) {
+         setErrorMsg('Failed to update room: ' + err.message);
